@@ -1,4 +1,4 @@
-package packing
+package decoder
 
 type Decoder[I any, C any] interface {
 	Decode(items []I, containers []C) (*Solution[I], error)
@@ -6,5 +6,5 @@ type Decoder[I any, C any] interface {
 
 type Solution[I any] struct {
 	PackedItems []I
-	ObjFuncVal  int
+	ObjFnVal    int
 }

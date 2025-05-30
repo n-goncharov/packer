@@ -2,15 +2,13 @@ package main
 
 import (
 	"fmt"
-	"github.com/n-goncharov/packing-backend/internal/packing"
+	"github.com/n-goncharov/packing-backend/internal/packing/container"
+	"github.com/n-goncharov/packing-backend/internal/packing/decoder/skyline"
+	"github.com/n-goncharov/packing-backend/internal/packing/shape"
 )
 
 func main() {
-	var decoder packing.Decoder[packing.Rectangle, packing.Strip]
-
-	decoder = &packing.Skyline{}
-
-	items := []packing.Rectangle{
+	items := []*shape.Rect{
 		{Width: 10, Height: 140},
 		{Width: 60, Height: 170},
 		{Width: 40, Height: 50},
@@ -27,13 +25,20 @@ func main() {
 		{Width: 80, Height: 10},
 	}
 
-	containers := []packing.Strip{
+	containers := []*container.Strip{
 		{Width: 150},
 		{Width: 150},
 	}
 
-	solution, err := decoder.Decode(items, containers)
+	decoder, err := skyline.NewDecoder(items, containers)
 	if err != nil {
+		fmt.Println(err)
+		panic(err)
+	}
+
+	solution, err := decoder.Decode()
+	if err != nil {
+		fmt.Println(err)
 		panic(err)
 	}
 
@@ -41,5 +46,5 @@ func main() {
 		fmt.Println(rectangle)
 	}
 
-	fmt.Println(solution.ObjFuncVal)
+	fmt.Println(solution.ObjFnVal)
 }
