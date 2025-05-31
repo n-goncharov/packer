@@ -11,6 +11,14 @@ import (
 // @todo move some code to separate files/possibly packages
 // @todo possibly create const errors
 
+// @todo consider rects to be doubly linked list too:
+// to get rid of 'packed' bool field, just remove rect after packing
+// and search best-fit through remaining - not all.
+
+// @todo consider using just one Rect struct with Width, Height, X, Y if the above applies
+
+// @todo abstract linked list code
+
 type Segment struct {
 	width            uint
 	x, y             uint
@@ -92,7 +100,13 @@ type Rect struct {
 }
 
 func (r Rect) String() string {
-	return fmt.Sprintf("Rect{Width: %d, Height: %d, X: %d, Y: %d}", r.Width, r.Height, r.X, r.Y)
+	return fmt.Sprintf(
+		"Rect{Width: %d, Height: %d, X: %d, Y: %d}",
+		r.Width,
+		r.Height,
+		r.X,
+		r.Y,
+	)
 }
 
 func NewSegment(width, x, y uint) *Segment {
@@ -124,7 +138,10 @@ func NewDecoder(rects []*shape.Rect, strips []*container.Strip) (*Decoder, error
 }
 
 func (d *Decoder) Decode() (*decoder.Solution[*Rect], error) {
-	// Pack rects until the number packed equals the total.
+	// Create a slice for packed rects to save packing ordering.
+	packedRects := make([]*Rect, 0, len(d.rects))
+
+	// Pack rects until the number of packed equals the total.
 	for packedCount := 0; packedCount != len(d.rects); {
 		// Get the current left-bottom segment to pack a rect on it.
 		lbSegmentNode, err := d.getLeftBottom()
@@ -139,7 +156,7 @@ func (d *Decoder) Decode() (*decoder.Solution[*Rect], error) {
 		// then join left-bottom segment with the lowest neighboring segment
 		// and start new iteration.
 		if bestFitRect == nil {
-			err := d.joinWithLowest(lbSegmentNode)
+			err := d.join(lbSegmentNode)
 			if err != nil {
 				return nil, fmt.Errorf("error joining LB segment: %w", err)
 			}
@@ -155,12 +172,15 @@ func (d *Decoder) Decode() (*decoder.Solution[*Rect], error) {
 		// Mark the best-fit rect as packed and increment the packed counter.
 		bestFitRect.packed = true
 		packedCount++
+
+		// Add packed rect.
+		packedRects = append(packedRects, bestFitRect)
 	}
 
-	// Return a solution with the objective function value and packed items.
+	// Return the objective function value and packed rects.
 	return &decoder.Solution[*Rect]{
 		ObjFnVal:    int(d.topHeight()),
-		PackedItems: d.rects,
+		PackedItems: packedRects,
 	}, nil
 }
 
@@ -263,7 +283,7 @@ func (d *Decoder) getBestFit(segment *Segment) *Rect {
 	return bestFitRect
 }
 
-func (d *Decoder) joinWithLowest(segmentNode *SegmentNode) error {
+func (d *Decoder) join(segmentNode *SegmentNode) error {
 	// Check with which neighbouring segment to join.
 	if segmentNode.data.lHeight < segmentNode.data.rHeight {
 		return d.joinNext(segmentNode)
