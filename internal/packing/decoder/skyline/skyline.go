@@ -6,7 +6,6 @@ import (
 	"github.com/n-goncharov/packing-backend/internal/packing/decoder"
 	"github.com/n-goncharov/packing-backend/internal/packing/shape"
 	"math"
-	"slices"
 )
 
 // @todo global - rectangle -> rect
@@ -15,6 +14,74 @@ type Segment struct {
 	width            uint
 	x, y             uint
 	lHeight, rHeight float64
+}
+
+type SegmentNode struct {
+	data *Segment
+	next *SegmentNode
+	prev *SegmentNode
+}
+
+type SegmentList struct {
+	head *SegmentNode
+	tail *SegmentNode
+}
+
+func (sl *SegmentList) Append(data *Segment) {
+	newNode := &SegmentNode{data: data}
+
+	if sl.head == nil {
+		sl.head = newNode
+		sl.tail = newNode
+		return
+	}
+
+	newNode.prev = sl.tail
+	sl.tail.next = newNode
+	sl.tail = newNode
+}
+
+func (sl *SegmentList) InsertBefore(nextNode *SegmentNode, data *Segment) {
+	if nextNode == nil {
+		fmt.Println("next node is nil")
+		return
+	}
+
+	newNode := &SegmentNode{
+		data: data,
+		prev: nextNode.prev,
+		next: nextNode,
+	}
+
+	nextNode.prev = newNode
+
+	if newNode.prev != nil {
+		newNode.prev.next = newNode
+	} else {
+		sl.head = newNode
+	}
+}
+
+func (sl *SegmentList) Delete(segmentNode *SegmentNode) {
+	if segmentNode == nil {
+		fmt.Println("segment node is nil")
+		return
+	}
+
+	if segmentNode.prev == nil {
+		sl.head = segmentNode.next
+	} else {
+		segmentNode.prev.next = segmentNode.next
+	}
+
+	if segmentNode.next == nil {
+		sl.tail = segmentNode.prev
+	} else {
+		segmentNode.next.prev = segmentNode.prev
+	}
+
+	segmentNode.prev = nil
+	segmentNode.next = nil
 }
 
 type Rect struct {
@@ -39,7 +106,7 @@ func NewSegment(width, x, y uint) *Segment {
 
 type Decoder struct {
 	rects    []*Rect
-	segments []*Segment
+	segments *SegmentList
 }
 
 func validate(rects []*shape.Rect, strips []*container.Strip) error {
@@ -74,15 +141,15 @@ func NewDecoder(rects []*shape.Rect, strips []*container.Strip) (*Decoder, error
 	}
 
 	var x uint
-	segments := make([]*Segment, len(strips))
-	for i, strip := range strips {
-		segments[i] = NewSegment(strip.Width, x, 0)
+	segmentList := &SegmentList{}
+	for _, strip := range strips {
+		segmentList.Append(NewSegment(strip.Width, x, 0))
 		x += strip.Width
 	}
 
 	return &Decoder{
 		rects:    packingRects,
-		segments: segments,
+		segments: segmentList,
 	}, nil
 }
 
@@ -90,19 +157,18 @@ func (d *Decoder) Decode() (*decoder.Solution[*Rect], error) {
 	// Pack rects until the number packed equals the total number.
 	for packedCount := 0; packedCount != len(d.rects); {
 		// Get the current left-bottom segment to pack a rect on it.
-		lbSegmentIdx, err := d.getLBIdx()
+		lbSegmentNode, err := d.getLB()
 		if err != nil {
 			return nil, err
 		}
-		lbSegment := d.segments[lbSegmentIdx]
 
 		// Get the best-fit rect to pack onto left-bottom segment.
-		bestFitRect := d.getBestFit(lbSegment)
+		bestFitRect := d.getBestFit(lbSegmentNode.data)
 
 		// If no such rectangle was found = all of them are wider than left-bottom segment,
 		// then lift left-bottom segment to the lowest neighboring segment and start new iteration.
 		if bestFitRect == nil {
-			err := d.liftLB(lbSegmentIdx)
+			err := d.liftLB(lbSegmentNode)
 			if err != nil {
 				return nil, fmt.Errorf("error lifting LB segment: %w", err)
 			}
@@ -110,7 +176,7 @@ func (d *Decoder) Decode() (*decoder.Solution[*Rect], error) {
 		}
 
 		// If best-fit rect was found, we pack it.
-		err = d.pack(bestFitRect, lbSegmentIdx)
+		err = d.pack(bestFitRect, lbSegmentNode)
 		if err != nil {
 			return nil, err
 		}
@@ -133,19 +199,23 @@ func (d *Decoder) Decode() (*decoder.Solution[*Rect], error) {
 	}, nil
 }
 
-func (d *Decoder) getLBIdx() (int, error) {
-	idx := 0
-	lbSegment := d.segments[idx]
-	for i, segm := range d.segments {
-		if segm.y < lbSegment.y {
-			lbSegment = segm
-			idx = i
+func (d *Decoder) getLB() (*SegmentNode, error) {
+	lbSegment := d.segments.head
+	current := d.segments.head.next
+	for current != nil {
+		if current.data.y < lbSegment.data.y {
+			lbSegment = current
 		}
+		current = current.next
 	}
-	if lbSegment.lHeight >= 0 || lbSegment.rHeight >= 0 {
-		return 0, fmt.Errorf("corrupted LB segment. lHeight: %f, rHeight: %f", lbSegment.lHeight, lbSegment.rHeight)
+	if lbSegment.data.lHeight >= 0 || lbSegment.data.rHeight >= 0 {
+		return nil, fmt.Errorf(
+			"corrupted LB segment. lHeight: %f, rHeight: %f",
+			lbSegment.data.lHeight,
+			lbSegment.data.rHeight,
+		)
 	}
-	return idx, nil
+	return lbSegment, nil
 }
 
 // @todo check the logic
@@ -187,12 +257,10 @@ func (d *Decoder) getBestFit(lbSegment *Segment) *Rect {
 }
 
 // @todo check the logic
-func (d *Decoder) liftLB(lbSegmentIdx int) error {
-	lbSegment := d.segments[lbSegmentIdx]
-
+func (d *Decoder) liftLB(lbSegmentNode *SegmentNode) error {
 	// The following bool vars defines location of LB segment in the strip.
-	leftMost := lbSegment.lHeight == math.Inf(-1)
-	rightMost := lbSegment.rHeight == math.Inf(-1)
+	leftMost := lbSegmentNode.data.lHeight == math.Inf(-1)
+	rightMost := lbSegmentNode.data.rHeight == math.Inf(-1)
 
 	// If the right one is the lowest - glue the segment to it, otherwise if the left one - to the left one.
 	// If we raise it to the right, we already assume that there will be no strip edge on the right.
@@ -200,13 +268,13 @@ func (d *Decoder) liftLB(lbSegmentIdx int) error {
 	// In the liftToRight method we pass information whether the segment is from the left edge of the strip.
 	// To the liftToLeft method we pass information whether the segment is on the right edge of the strip.
 	// Otherwise, there is an error.
-	if lbSegment.lHeight < lbSegment.rHeight {
-		err := d.liftToRight(lbSegmentIdx, leftMost)
+	if lbSegmentNode.data.lHeight < lbSegmentNode.data.rHeight {
+		err := d.liftToRight(lbSegmentNode, leftMost)
 		if err != nil {
 			return err
 		}
 	} else {
-		err := d.liftToLeft(lbSegmentIdx, rightMost)
+		err := d.liftToLeft(lbSegmentNode, rightMost)
 		if err != nil {
 			return err
 		}
@@ -216,29 +284,29 @@ func (d *Decoder) liftLB(lbSegmentIdx int) error {
 }
 
 // @todo check the logic
-func (d *Decoder) liftToRight(segmentIdx int, leftMost bool) error {
+func (d *Decoder) liftToRight(segmentNode *SegmentNode, leftMost bool) error {
 	// Here, just in case, we check if we are working with the last segment,
 	// so that we don't go beyond the slice boundaries.
-	if segmentIdx != len(d.segments)-1 {
+	if segmentNode != d.segments.tail {
 		// If the segment is not on the left edge of the strip, we adjust its left height and, accordingly
 		// the right height of the segment on the left.
 		if !leftMost {
 			// Here, just in case, we check if we are working with the first segment,
 			// so that we don't go beyond the slice boundaries.
-			if segmentIdx == 0 {
+			if segmentNode == d.segments.head {
 				return fmt.Errorf("adjusting the left neighbor of the first segment")
 			}
-			d.segments[segmentIdx].lHeight -= d.segments[segmentIdx].rHeight
-			d.segments[segmentIdx-1].rHeight = -d.segments[segmentIdx].lHeight
+			segmentNode.data.lHeight -= segmentNode.data.rHeight
+			segmentNode.prev.data.rHeight = -segmentNode.data.lHeight
 		}
 
 		// Here we adjust the width, y-coordinate and right height of the segment.
-		d.segments[segmentIdx].width += d.segments[segmentIdx+1].width
-		d.segments[segmentIdx].y = d.segments[segmentIdx+1].y
-		d.segments[segmentIdx].rHeight = d.segments[segmentIdx+1].rHeight
+		segmentNode.data.width += segmentNode.next.data.width
+		segmentNode.data.y = segmentNode.next.data.y
+		segmentNode.data.rHeight = segmentNode.next.data.rHeight
 
 		// Delete the segment following it.
-		d.segments = slices.Delete(d.segments, segmentIdx+1, segmentIdx+2)
+		d.segments.Delete(segmentNode.next)
 	} else {
 		return fmt.Errorf("trying to lift to the right the last segment")
 	}
@@ -246,101 +314,99 @@ func (d *Decoder) liftToRight(segmentIdx int, leftMost bool) error {
 }
 
 // @todo check the logic
-func (d *Decoder) liftToLeft(segmentIdx int, rightMost bool) error {
+func (d *Decoder) liftToLeft(segmentNode *SegmentNode, rightMost bool) error {
 	// Here, just in case, we check if we are working with the first segment,
 	// so that we don't go beyond the slice boundaries.
-	if segmentIdx != 0 {
+	if segmentNode != d.segments.head {
 		// If the segment is not on the right edge of the strip, we adjust its right height and, accordingly
 		// the left height of the segment on the right.
 		if !rightMost {
 			// Here, just in case, we check if we are working with the last segment,
 			// so that we don't go beyond the slice boundaries.
-			if segmentIdx == len(d.segments)-1 {
+			if segmentNode == d.segments.tail {
 				return fmt.Errorf("adjusting the right neighbor of the last segment")
 			}
-			d.segments[segmentIdx].rHeight -= d.segments[segmentIdx].lHeight
-			d.segments[segmentIdx+1].lHeight = -d.segments[segmentIdx].rHeight
+			segmentNode.data.rHeight -= segmentNode.data.lHeight
+			segmentNode.next.data.lHeight = -segmentNode.data.rHeight
 		}
 
 		// Here we adjust the width, x-coordinate, y-coordinate and left height of the segment.
-		d.segments[segmentIdx].width += d.segments[segmentIdx-1].width
-		d.segments[segmentIdx].x = d.segments[segmentIdx-1].x
-		d.segments[segmentIdx].y = d.segments[segmentIdx-1].y
-		d.segments[segmentIdx].lHeight = d.segments[segmentIdx-1].lHeight
+		segmentNode.data.width += segmentNode.prev.data.width
+		segmentNode.data.x = segmentNode.prev.data.x
+		segmentNode.data.y = segmentNode.prev.data.y
+		segmentNode.data.lHeight = segmentNode.prev.data.lHeight
 
 		// Delete the previous segment.
-		d.segments = slices.Delete(d.segments, segmentIdx-1, segmentIdx)
+		d.segments.Delete(segmentNode.prev)
 	} else {
 		return fmt.Errorf("trying to lift to the left the first segment")
 	}
 	return nil
 }
 
-func (d *Decoder) pack(rect *Rect, segmentIdx int) error {
-	segment := d.segments[segmentIdx]
-
+func (d *Decoder) pack(rect *Rect, segmentNode *SegmentNode) error {
 	// Set the segment's coordinates to the rect.
-	rect.X = segment.x
-	rect.Y = segment.y
+	rect.X = segmentNode.data.x
+	rect.Y = segmentNode.data.y
 
 	switch {
-	case rect.Width == segment.width:
+	case rect.Width == segmentNode.data.width:
 		// Adjust the y-coordinate.
-		segment.y += rect.Height
+		segmentNode.data.y += rect.Height
 
 		// Do if segment is not first in the strip.
-		if segment.lHeight != math.Inf(-1) {
-			if segmentIdx == 0 {
+		if segmentNode.data.lHeight != math.Inf(-1) {
+			if segmentNode == d.segments.head {
 				return fmt.Errorf("corrupted lHeight for the very first segment")
 			}
 
 			// Adjust its lHeight.
-			segment.lHeight += float64(rect.Height)
+			segmentNode.data.lHeight += float64(rect.Height)
 
 			// Adjust its left neighbour's rHeight.
-			d.segments[segmentIdx-1].rHeight = -segment.lHeight
+			segmentNode.prev.data.rHeight = -segmentNode.data.lHeight
 		}
 
 		// Do if segment is not last in the strip.
-		if segment.rHeight != math.Inf(-1) {
-			if segmentIdx == len(d.segments)-1 {
+		if segmentNode.data.rHeight != math.Inf(-1) {
+			if segmentNode == d.segments.tail {
 				return fmt.Errorf("corrupted rHeight for the vary last segment")
 			}
 
 			// Adjust its rHeight.
-			segment.rHeight += float64(rect.Height)
+			segmentNode.data.rHeight += float64(rect.Height)
 
 			// Adjust lHeight for the right neighbour.
-			d.segments[segmentIdx+1].lHeight = -segment.rHeight
+			segmentNode.next.data.lHeight = -segmentNode.data.rHeight
 		}
-	case rect.Width < segment.width:
+	case rect.Width < segmentNode.data.width:
 		// Add new segment.
-		newSegment := NewSegment(rect.Width, segment.x, segment.y+rect.Height)
+		newSegment := NewSegment(rect.Width, segmentNode.data.x, segmentNode.data.y+rect.Height)
 
 		// Do if current segment is not first in the strip.
-		if segment.lHeight != math.Inf(-1) {
-			if segmentIdx == 0 {
+		if segmentNode.data.lHeight != math.Inf(-1) {
+			if segmentNode == d.segments.head {
 				return fmt.Errorf("corrupted lHeight for the very first segment")
 			}
 
 			// Set lHeight for the new segment.
-			newSegment.lHeight = segment.lHeight + float64(rect.Height)
+			newSegment.lHeight = segmentNode.data.lHeight + float64(rect.Height)
 
 			// Adjust rHeight for the left neighbour
-			d.segments[segmentIdx-1].rHeight = -newSegment.lHeight
+			segmentNode.prev.data.rHeight = -newSegment.lHeight
 		}
 
 		// Set rHeight for the new segment.
 		newSegment.rHeight = float64(rect.Height)
 
 		// Adjust current segment's fields.
-		segment.x += rect.Width
-		segment.width -= rect.Width
-		segment.lHeight = -newSegment.rHeight
+		segmentNode.data.x += rect.Width
+		segmentNode.data.width -= rect.Width
+		segmentNode.data.lHeight = -newSegment.rHeight
 
 		// Insert new segment.
-		d.segments = slices.Insert(d.segments, segmentIdx, newSegment)
-	case rect.Width > segment.width:
+		d.segments.InsertBefore(segmentNode, newSegment)
+	case rect.Width > segmentNode.data.width:
 		return fmt.Errorf("rect wider than segment")
 	}
 	return nil
@@ -348,10 +414,12 @@ func (d *Decoder) pack(rect *Rect, segmentIdx int) error {
 
 func (d *Decoder) topHeight() uint {
 	var topHeight uint
-	for _, segment := range d.segments {
-		if segment.y > topHeight {
-			topHeight = segment.y
+	current := d.segments.head
+	for current != nil {
+		if current.data.y > topHeight {
+			topHeight = current.data.y
 		}
+		current = current.next
 	}
 	return topHeight
 }
