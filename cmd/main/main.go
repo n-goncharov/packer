@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+
 	"github.com/n-goncharov/packing-backend/internal/packing/container"
 	"github.com/n-goncharov/packing-backend/internal/packing/decoder/skyline"
 	"github.com/n-goncharov/packing-backend/internal/packing/shape"
