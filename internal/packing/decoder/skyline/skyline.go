@@ -2,10 +2,11 @@ package skyline
 
 import (
 	"fmt"
-	"github.com/n-goncharov/packing-backend/internal/packing/container"
-	"github.com/n-goncharov/packing-backend/internal/packing/decoder"
-	"github.com/n-goncharov/packing-backend/internal/packing/shape"
 	"math"
+
+	"github.com/n-goncharov/packer/internal/packing/container"
+	"github.com/n-goncharov/packer/internal/packing/decoder"
+	"github.com/n-goncharov/packer/internal/packing/shape"
 )
 
 // @todo move some code to separate files/possibly packages

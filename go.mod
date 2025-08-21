@@ -1,3 +1,3 @@
-module github.com/n-goncharov/packing-backend
+module github.com/n-goncharov/packer
 
-go 1.23.4
+go 1.25.0

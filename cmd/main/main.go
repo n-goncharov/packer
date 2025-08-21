@@ -3,9 +3,9 @@ package main
 import (
 	"fmt"
 
-	"github.com/n-goncharov/packing-backend/internal/packing/container"
-	"github.com/n-goncharov/packing-backend/internal/packing/decoder/skyline"
-	"github.com/n-goncharov/packing-backend/internal/packing/shape"
+	"github.com/n-goncharov/packer/internal/packing/container"
+	"github.com/n-goncharov/packer/internal/packing/decoder/skyline"
+	"github.com/n-goncharov/packer/internal/packing/shape"
 )
 
 func main() {
