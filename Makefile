@@ -1,3 +1,4 @@
+run-ui:
+	go run cmd/app/main.go
 run:
-	go run cmd/backend/main.go
-
+	go run cmd/main/main.go

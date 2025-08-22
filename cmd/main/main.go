@@ -4,12 +4,14 @@ import (
 	"fmt"
 
 	"github.com/n-goncharov/packer/internal/packing/container"
+	"github.com/n-goncharov/packer/internal/packing/decoder"
 	"github.com/n-goncharov/packer/internal/packing/decoder/skyline"
-	"github.com/n-goncharov/packer/internal/packing/shape"
+	"github.com/n-goncharov/packer/internal/packing/item"
+	"golang.org/x/exp/constraints"
 )
 
 func main() {
-	items := []*shape.Rect{
+	items := []*item.Rect{
 		{Width: 10, Height: 140},
 		{Width: 60, Height: 170},
 		{Width: 40, Height: 50},
@@ -28,24 +30,32 @@ func main() {
 
 	containers := []*container.Strip{
 		{Width: 150},
-		{Width: 150},
+		{Width: 10},
 	}
 
-	decoder, err := skyline.NewDecoder(items, containers)
+	skylineDecoder, err := skyline.NewDecoder(items, containers)
 	if err != nil {
-		fmt.Println(err)
-		panic(err)
+		onError(err)
 	}
 
+	// Any other decoder can be passed here!
+	process(skylineDecoder)
+}
+
+func process[T any, V constraints.Integer | constraints.Float](decoder decoder.Interface[T, V]) {
 	solution, err := decoder.Decode()
 	if err != nil {
-		fmt.Println(err)
-		panic(err)
+		onError(err)
 	}
 
-	for _, rectangle := range solution.PackedItems {
-		fmt.Println(rectangle)
+	for _, i := range solution.Items {
+		fmt.Println(i)
 	}
 
-	fmt.Println(solution.ObjFnVal)
+	fmt.Println(solution.ObjVal)
+}
+
+func onError(err error) {
+	fmt.Println(err)
+	panic(err)
 }
