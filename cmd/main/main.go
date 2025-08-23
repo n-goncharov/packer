@@ -11,6 +11,7 @@ import (
 )
 
 func main() {
+	// @todo understand why rects here are already pointers
 	items := []*item.Rect{
 		{Width: 10, Height: 140},
 		{Width: 60, Height: 170},
@@ -33,22 +34,22 @@ func main() {
 		{Width: 10},
 	}
 
-	skylineDecoder, err := skyline.NewDecoder(items, containers)
+	skylineDecoder, err := skyline.NewDecoder(containers)
 	if err != nil {
 		onError(err)
 	}
 
-	// Any other decoder can be passed here!
-	process(skylineDecoder)
+	// Any other decoder with generic items can be passed here!
+	process(skylineDecoder, items)
 }
 
-func process[T any, V constraints.Integer | constraints.Float](decoder decoder.Interface[T, V]) {
-	solution, err := decoder.Decode()
+func process[I, PI any, V constraints.Integer | constraints.Float](decoder decoder.Interface[I, PI, V], items []*I) {
+	solution, err := decoder.Decode(items)
 	if err != nil {
 		onError(err)
 	}
 
-	for _, i := range solution.Items {
+	for _, i := range solution.PackedItems {
 		fmt.Println(i)
 	}
 

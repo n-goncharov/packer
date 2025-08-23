@@ -6,7 +6,7 @@ type Rect struct {
 	Width, Height uint
 }
 
-type PlacedRect = Placed[*Rect]
+type PackedRect = Packed[*Rect]
 
 func (r Rect) String() string {
 	return fmt.Sprintf(

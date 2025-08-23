@@ -9,29 +9,33 @@ import (
 	"github.com/n-goncharov/packer/internal/packing/item"
 )
 
+// @todo add tests
+
 // @todo create package level (const) errors through errors.New.
 
 type Decoder struct {
-	rects        []*item.PlacedRect // @todo use container/list instead
+	rects        []*item.PackedRect // @todo use container/list instead
 	segmentsList *segmentList       // @todo use container/list instead
 }
 
-func NewDecoder(rects []*item.Rect, strips []*container.Strip) (*Decoder, error) {
-	// Validate input.
-	err := validate(rects, strips)
-	if err != nil {
-		return nil, fmt.Errorf("ivalid input: %w", err)
-	}
-
+func NewDecoder(strips []*container.Strip) (*Decoder, error) {
 	return &Decoder{
-		rects:        toPlacedRects(rects),
 		segmentsList: toSegmentsList(strips),
 	}, nil
 }
 
-func (d *Decoder) Decode() (*decoder.Solution[*item.PlacedRect, uint], error) {
+func (d *Decoder) Decode(rects []*item.Rect) (*decoder.Solution[*item.PackedRect, uint], error) {
+	// Validate input.
+	err := d.validate(rects)
+	if err != nil {
+		return nil, fmt.Errorf("invalid input: %w", err)
+	}
+
+	// Init state for rects.
+	d.rects = toPackedRects(rects)
+
 	// Create a slice for packed rects to save packing ordering.
-	packedRects := make([]*item.PlacedRect, 0, len(d.rects))
+	packedRects := make([]*item.PackedRect, 0, len(rects))
 
 	// @todo after making rects doubly linked list the condition will be: while len(d.rects) != 0.
 	// Pack rects until the number of packed equals the total.
@@ -72,33 +76,35 @@ func (d *Decoder) Decode() (*decoder.Solution[*item.PlacedRect, uint], error) {
 	}
 
 	// Return the solution: packed rects and objective function value.
-	return &decoder.Solution[*item.PlacedRect, uint]{
-		Items:  packedRects,
-		ObjVal: d.segmentsList.topHeight(),
+	return &decoder.Solution[*item.PackedRect, uint]{
+		PackedItems: packedRects,
+		ObjVal:      d.segmentsList.topHeight(),
 	}, nil
 }
 
-func validate(rects []*item.Rect, strips []*container.Strip) error {
-	var maxStripWidth uint
-	for _, strip := range strips {
-		if strip.Width > maxStripWidth {
-			maxStripWidth = strip.Width
+func (d *Decoder) validate(rects []*item.Rect) error {
+	// Find width of the widest strip.
+	var maxWidth uint
+	for s := d.segmentsList.head; s != nil; s = s.next {
+		if s.data.width > maxWidth {
+			maxWidth = s.data.width
 		}
 	}
 
+	// Check if all rectangles can fit into it.
 	for _, rect := range rects {
-		if rect.Width > maxStripWidth {
-			return fmt.Errorf("rectangle width mustn't be greater than the widest strip (%d)", maxStripWidth)
+		if rect.Width > maxWidth {
+			return fmt.Errorf("rectangle width mustn't be greater than the widest strip (%d)", maxWidth)
 		}
 	}
 
 	return nil
 }
 
-func toPlacedRects(rects []*item.Rect) []*item.PlacedRect {
-	packingRects := make([]*item.PlacedRect, len(rects))
+func toPackedRects(rects []*item.Rect) []*item.PackedRect {
+	packingRects := make([]*item.PackedRect, len(rects))
 	for i, rect := range rects {
-		packingRects[i] = &item.PlacedRect{Item: rect}
+		packingRects[i] = &item.PackedRect{Item: rect}
 	}
 	return packingRects
 }
@@ -135,8 +141,8 @@ func (sl *segmentList) getLeftBottom() (*segmentNode, error) {
 	return lbSegment, nil
 }
 
-func (d *Decoder) getBestFit(segment *segment) *item.PlacedRect {
-	var bestFitRect *item.PlacedRect
+func (d *Decoder) getBestFit(segment *segment) *item.PackedRect {
+	var bestFitRect *item.PackedRect
 	bestFitVal := -1
 	for _, r := range d.rects {
 		// If the rect has already been packed or
@@ -174,7 +180,8 @@ func (d *Decoder) getBestFit(segment *segment) *item.PlacedRect {
 }
 
 func (d *Decoder) join(segmentNode *segmentNode) error {
-	// In case segment is strip, and we cannot join -> just delete this segment.
+	// @todo move it out of the func
+	// In case segment is a strip, and we cannot join it -> just delete this segment.
 	if segmentNode.data.lHeight == math.Inf(-1) && segmentNode.data.rHeight == math.Inf(-1) {
 		d.segmentsList.delete(segmentNode)
 		return nil
@@ -246,7 +253,7 @@ func (d *Decoder) joinPrev(segmentNode *segmentNode) error {
 }
 
 // @todo dedup
-func (d *Decoder) pack(rect *item.PlacedRect, segmentNode *segmentNode) error {
+func (d *Decoder) pack(rect *item.PackedRect, segmentNode *segmentNode) error {
 	// Set segment's coordinates to the rect.
 	rect.X = segmentNode.data.x
 	rect.Y = segmentNode.data.y
