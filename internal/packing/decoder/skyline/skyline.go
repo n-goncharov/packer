@@ -13,11 +13,11 @@ import (
 // @todo add tests
 // @todo add godoc
 
-// @todo make stateless?
+// @todo make stateless
 type Decoder struct {
 	strips      []*container.Strip
-	rects       []*item.PackedRect // @todo use container/list instead
-	segmentList *segmentList       //@todo use container/list instead
+	rects       []*item.PackedRect // @todo use doubly linked list implementation
+	segmentList *segmentList
 }
 
 func NewDecoder(strips []*container.Strip) (*Decoder, error) {
@@ -89,7 +89,7 @@ func (d *Decoder) init(rects []*item.Rect) {
 	d.initSegmentList()
 }
 
-// @todo also delete each segment on which each rect cannot be packed
+// @todo also remove each segment on which each rect cannot be packed
 func (d *Decoder) validate(rects []*item.Rect) error {
 	// Find width of the widest strip.
 	var maxWidth uint
@@ -274,7 +274,6 @@ func (d *Decoder) join(segmentNode *segmentNode) error {
 	return d.joinPrev(segmentNode)
 }
 
-// @todo check logic of this func again
 func (d *Decoder) pack(rect *item.PackedRect, segmentNode *segmentNode) error {
 	// Set segment's coordinates to the rect.
 	rect.X = segmentNode.data.x

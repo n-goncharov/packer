@@ -5,7 +5,7 @@ import (
 	"math"
 )
 
-// @todo start to add godoc
+// @todo add godoc
 
 // @todo make rects to be doubly linked list too:
 // to get rid of 'Packed' bool field (just remove rect after packing)
@@ -27,20 +27,19 @@ func newSegment(width, x, y uint) *segment {
 	}
 }
 
-// @todo use container/list instead
+// @todo in a separate package create a separate generic structure for doubly linked list and its implementations
 type segmentNode struct {
 	data *segment
 	next *segmentNode
 	prev *segmentNode
 }
 
-// @todo use container/list instead
 type segmentList struct {
 	head *segmentNode
 	tail *segmentNode
 }
 
-// @todo use container/list instead
+// @todo call it PushBack
 func (sl *segmentList) append(data *segment) {
 	newNode := &segmentNode{data: data}
 
@@ -55,7 +54,6 @@ func (sl *segmentList) append(data *segment) {
 	sl.tail = newNode
 }
 
-// @todo use container/list instead
 func (sl *segmentList) insertBefore(nextNode *segmentNode, data *segment) {
 	if nextNode == nil {
 		fmt.Println("next node is nil")
@@ -77,7 +75,7 @@ func (sl *segmentList) insertBefore(nextNode *segmentNode, data *segment) {
 	}
 }
 
-// @todo use container/list instead
+// @todo call it Remove
 func (sl *segmentList) delete(segmentNode *segmentNode) {
 	if segmentNode == nil {
 		fmt.Println("segment node is nil")
@@ -100,7 +98,6 @@ func (sl *segmentList) delete(segmentNode *segmentNode) {
 	segmentNode.next = nil
 }
 
-// @todo use container/list instead
 func (sl *segmentList) topHeight() uint {
 	var topHeight uint
 	current := sl.head
