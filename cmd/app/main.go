@@ -22,6 +22,7 @@ func main() {
 	app.Main()
 }
 
+// @todo visualize some packaging
 func run() error {
 	w := new(app.Window)
 	w.Option(app.Title("Packer"))

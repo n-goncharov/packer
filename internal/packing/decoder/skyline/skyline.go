@@ -1,6 +1,7 @@
 package skyline
 
 import (
+	"errors"
 	"fmt"
 	"math"
 
@@ -9,39 +10,54 @@ import (
 	"github.com/n-goncharov/packer/internal/packing/item"
 )
 
-// @todo create package level (const) errors through errors.New.
-// @todo add tests
-// @todo add godoc
+// Order of todos:
+// @todo make all todos in packing folder
+// @todo add tests for code here (especially fuzzing)
+// @todo try to deduplicate (if possible) and refine
+// @todo add godoc for all written code
 
-// @todo make stateless
+var (
+	ErrInvalidInput = errors.New("invalid input")
+	ErrInternal     = errors.New("internal error")
+)
+
+// @todo 1. make stateless
 type Decoder struct {
-	strips      []*container.Strip
-	rects       []*item.PackedRect // @todo use doubly linked list implementation
+	strips []*container.Strip
+	// @todo 2. make rects to be doubly linked list too (create generic list impl first)
+	// to get rid of 'Packed' bool field (just remove rect after packing)
+	// and search best-fit through remaining list - not all rects.
+	rects       []*item.PackedRect
 	segmentList *segmentList
 }
 
+// @todo 1. should be stateless
 func NewDecoder(strips []*container.Strip) (*Decoder, error) {
 	return &Decoder{
 		strips: strips,
 	}, nil
 }
 
+// @todo 1. change signature
 func (d *Decoder) Decode(rects []*item.Rect) (*decoder.Solution[*item.PackedRect, uint], error) {
+	// @todo 1. should be stateless
 	// Init state of Decoder.
 	d.init(rects)
 
+	// @todo 1. provide segments also
 	// Validate input.
 	err := d.validate(rects)
 	if err != nil {
-		return nil, fmt.Errorf("invalid input: %w", err)
+		return nil, fmt.Errorf("%w: %v", ErrInvalidInput, err)
 	}
+
+	// @todo 2. create a doubly linked list of rects
 
 	// Create a slice of packed rects to save packing ordering.
 	packedRects := make([]*item.PackedRect, 0, len(rects))
 
-	// @todo after making rects doubly linked list the condition will be: while len(d.rects) != 0.
 	// Pack rects until the number of packed equals the total.
-	for packedCount := 0; packedCount != len(d.rects); {
+	for packedCount := 0; packedCount != len(rects); {
 		// Get the current left-bottom segment to pack a rect on it.
 		lbSegmentNode, err := d.segmentList.getLeftBottom()
 		if err != nil {
@@ -51,22 +67,22 @@ func (d *Decoder) Decode(rects []*item.Rect) (*decoder.Solution[*item.PackedRect
 		// Get the best-fit rect to pack onto left-bottom segment.
 		bestFitRect := d.getBestFit(lbSegmentNode.data)
 
-		// If no such rect was found then all of them are wider than the left-bottom segment,
-		// then join left-bottom segment with the lowest neighboring segment
-		// and start new iteration.
+		// If no such rect is found it means that all rects are wider than the left-bottom segment.
+		// In this case merge left-bottom segment with the lowest neighboring segment and start new iteration.
 		if bestFitRect == nil {
-			if err := d.join(lbSegmentNode); err != nil {
-				return nil, fmt.Errorf("error joining LB segment: %w", err)
+			if err := d.merge(lbSegmentNode); err != nil {
+				return nil, fmt.Errorf("%w: error merging LB segment: %v", ErrInternal, err)
 			}
 			continue
 		}
 
-		// If the best-fit rect was found, pack it.
+		// If the best-fit rect is found, pack it.
 		err = d.pack(bestFitRect, lbSegmentNode)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("%w: error packing rect: %v", ErrInternal, err)
 		}
 
+		// @todo 2. remove this
 		// Mark the best-fit rect as packed.
 		bestFitRect.Packed = true
 
@@ -75,6 +91,8 @@ func (d *Decoder) Decode(rects []*item.Rect) (*decoder.Solution[*item.PackedRect
 
 		// Increment the packed counter.
 		packedCount++
+
+		// @todo 2. packed rect should be removed from rects list
 	}
 
 	// Return the solution: packed rects and objective function value.
@@ -84,12 +102,14 @@ func (d *Decoder) Decode(rects []*item.Rect) (*decoder.Solution[*item.PackedRect
 	}, nil
 }
 
+// @todo 1. change due to getting rid of struct state
 func (d *Decoder) init(rects []*item.Rect) {
 	d.rects = toPackedRects(rects)
 	d.initSegmentList()
 }
 
-// @todo also remove each segment on which each rect cannot be packed
+// @todo 1. accept segments
+// @todo 3. also remove each segment on which each rect cannot be packed (segment's width less than each rect's width)
 func (d *Decoder) validate(rects []*item.Rect) error {
 	// Find width of the widest strip.
 	var maxWidth uint
@@ -137,12 +157,12 @@ func (sl *segmentList) getLeftBottom() (*segmentNode, error) {
 		current = current.next
 	}
 
-	// @todo maybe move this check to the tests later and remove error return
+	// @todo 4. maybe move this check to the tests later and remove error return
 	// Here we are not comparing r.Height with zero
-	// because there could be join with previous segment but next was the same height.
+	// because there could be merge with previous segment but next was the same height.
 	if lbSegment.data.lHeight >= 0 || lbSegment.data.rHeight > 0 {
 		return nil, fmt.Errorf(
-			"corrupted LB segment. lHeight: %f, rHeight: %f",
+			"corrupted LB segment\n lHeight: %f, rHeight: %f",
 			lbSegment.data.lHeight,
 			lbSegment.data.rHeight,
 		)
@@ -150,6 +170,7 @@ func (sl *segmentList) getLeftBottom() (*segmentNode, error) {
 	return lbSegment, nil
 }
 
+// @todo 2. change to method of rects list
 func (d *Decoder) getBestFit(lbSegm *segment) *item.PackedRect {
 	var bestFitRect *item.PackedRect
 	bestFitVal := -1
@@ -163,23 +184,24 @@ func (d *Decoder) getBestFit(lbSegm *segment) *item.PackedRect {
 		// Declare fitness value for the current rect.
 		fitVal := 0
 
-		// Increment if the rect height and the left segment height are equal.
-		if r.Item.Height == uint(math.Abs(lbSegm.lHeight)) {
+		// @todo should lHeight and rHeight be validated here (error if they are > (=?) 0)?
+		// Increment in the following cases:
+		// The rect height and the left segment height are equal.
+		if r.Item.Height == uint(lbSegm.lHeight) {
 			fitVal++
 		}
 
-		// Increment if the rect height and the right segment height are equal.
-		if r.Item.Height == uint(math.Abs(lbSegm.rHeight)) {
+		// The rect height and the right segment height are equal.
+		if r.Item.Height == uint(lbSegm.rHeight) {
 			fitVal++
 		}
 
-		// Increment if the rect width and the segment width are equal.
+		// The rect width and the segment width are equal.
 		if r.Item.Width == lbSegm.width {
 			fitVal++
 		}
 
-		// If the current rect's fitness value > best,
-		// then update best value and best rect.
+		// Update the best fitness value and the best rect.
 		if fitVal > bestFitVal {
 			bestFitVal = fitVal
 			bestFitRect = r
@@ -188,30 +210,32 @@ func (d *Decoder) getBestFit(lbSegm *segment) *item.PackedRect {
 	return bestFitRect
 }
 
+// @todo 5. change to method of segments list
 func (d *Decoder) adjustLHeight(segmentNode *segmentNode, height float64) error {
-	if segmentNode.data.lHeight == math.Inf(-1) {
+	if math.IsInf(segmentNode.data.lHeight, -1) {
 		return nil
 	}
 
 	// If the segment isn't on the left edge of the strip,
 	// adjust its left height and the right height of the prev segment.
 	if segmentNode == d.segmentList.head {
-		return fmt.Errorf("corrupted left height of the very first segment")
+		return errors.New("corrupted left height of the very first segment")
 	}
 	segmentNode.data.lHeight += height
 	segmentNode.prev.data.rHeight = -segmentNode.data.lHeight
 	return nil
 }
 
+// @todo 5. change to method of segments list
 func (d *Decoder) adjustRHeight(segmentNode *segmentNode, height float64) error {
-	if segmentNode.data.rHeight == math.Inf(-1) {
+	if math.IsInf(segmentNode.data.rHeight, -1) {
 		return nil
 	}
 
 	// If the segment isn't on the right edge of the strip,
 	// adjust its right height and the left height of the next segment.
 	if segmentNode == d.segmentList.tail {
-		return fmt.Errorf("corrupted right height of the very last segment")
+		return errors.New("corrupted right height of the very last segment")
 	}
 	segmentNode.data.rHeight += height
 	segmentNode.next.data.lHeight = -segmentNode.data.rHeight
@@ -219,9 +243,10 @@ func (d *Decoder) adjustRHeight(segmentNode *segmentNode, height float64) error 
 	return nil
 }
 
-func (d *Decoder) joinNext(segmentNode *segmentNode) error {
+// @todo 5. change to method of segments list
+func (d *Decoder) mergeNext(segmentNode *segmentNode) error {
 	if segmentNode == d.segmentList.tail {
-		return fmt.Errorf("trying to join last segment with next")
+		return errors.New("trying to merge last segment with next")
 	}
 
 	if err := d.adjustLHeight(segmentNode, -segmentNode.data.rHeight); err != nil {
@@ -239,9 +264,10 @@ func (d *Decoder) joinNext(segmentNode *segmentNode) error {
 	return nil
 }
 
-func (d *Decoder) joinPrev(segmentNode *segmentNode) error {
+// @todo 5. change to method of segments list
+func (d *Decoder) mergePrev(segmentNode *segmentNode) error {
 	if segmentNode == d.segmentList.head {
-		return fmt.Errorf("trying to join first segment with prev")
+		return errors.New("trying to merge first segment with prev")
 	}
 
 	if err := d.adjustRHeight(segmentNode, -segmentNode.data.lHeight); err != nil {
@@ -260,20 +286,22 @@ func (d *Decoder) joinPrev(segmentNode *segmentNode) error {
 	return nil
 }
 
-func (d *Decoder) join(segmentNode *segmentNode) error {
-	// In case segment is a strip, and we cannot join it -> just delete this segment.
-	if segmentNode.data.lHeight == math.Inf(-1) && segmentNode.data.rHeight == math.Inf(-1) {
+// @todo 5. change to method of segments list
+func (d *Decoder) merge(segmentNode *segmentNode) error {
+	// In case segment is a strip, and we cannot merge it -> just delete this segment.
+	if math.IsInf(segmentNode.data.lHeight, -1) && math.IsInf(segmentNode.data.rHeight, -1) {
 		d.segmentList.delete(segmentNode)
 		return nil
 	}
 
-	// Check with which neighbouring segment to join.
+	// Check with which neighbouring segment to merge.
 	if segmentNode.data.lHeight < segmentNode.data.rHeight {
-		return d.joinNext(segmentNode)
+		return d.mergeNext(segmentNode)
 	}
-	return d.joinPrev(segmentNode)
+	return d.mergePrev(segmentNode)
 }
 
+// @todo 5. change to method of segments list
 func (d *Decoder) pack(rect *item.PackedRect, segmentNode *segmentNode) error {
 	// Set segment's coordinates to the rect.
 	rect.X = segmentNode.data.x
@@ -298,9 +326,9 @@ func (d *Decoder) pack(rect *item.PackedRect, segmentNode *segmentNode) error {
 
 		// If the segment isn't on the left edge of the strip,
 		// adjust new segment's left height and the right height of the prev segment.
-		if segmentNode.data.lHeight != math.Inf(-1) {
+		if !math.IsInf(segmentNode.data.lHeight, -1) {
 			if segmentNode == d.segmentList.head {
-				return fmt.Errorf("corrupted left height of the very first segment")
+				return errors.New("corrupted left height of the very first segment")
 			}
 			s.lHeight = segmentNode.data.lHeight + float64(rect.Item.Height)
 			segmentNode.prev.data.rHeight = -s.lHeight

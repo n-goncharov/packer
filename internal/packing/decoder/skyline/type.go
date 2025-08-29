@@ -5,12 +5,6 @@ import (
 	"math"
 )
 
-// @todo add godoc
-
-// @todo make rects to be doubly linked list too:
-// to get rid of 'Packed' bool field (just remove rect after packing)
-// and search best-fit through remaining list - not all rects.
-
 type segment struct {
 	width            uint
 	x, y             uint

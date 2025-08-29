@@ -11,7 +11,6 @@ import (
 )
 
 func main() {
-	// @todo understand why rects here are already pointers
 	items := []*item.Rect{
 		{Width: 10, Height: 140},
 		{Width: 60, Height: 170},
