@@ -5,7 +5,7 @@ import "fmt"
 type Packed[I fmt.Stringer] struct {
 	Item I
 	X, Y uint
-	// @todo get rid in the future
+	// @todo get rid of it in the future
 	Packed bool
 }
 

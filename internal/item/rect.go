@@ -2,13 +2,13 @@ package item
 
 import "fmt"
 
-type Rect struct {
+type Rectangle struct {
 	Width, Height uint
 }
 
-type PackedRect = Packed[*Rect]
+type PackedRectangle = Packed[*Rectangle]
 
-func (r Rect) String() string {
+func (r Rectangle) String() string {
 	return fmt.Sprintf(
 		"Rect{Width: %d, Height: %d}",
 		r.Width,

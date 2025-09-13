@@ -2,10 +2,7 @@ module github.com/n-goncharov/packer
 
 go 1.25.0
 
-require (
-	cogentcore.org/core v0.3.13-0.20250909222513-1cba37a21a69
-	golang.org/x/exp v0.0.0-20240707233637-46b078467d37
-)
+require cogentcore.org/core v0.3.13-0.20250909222513-1cba37a21a69
 
 require (
 	github.com/Bios-Marcel/wastebasket/v2 v2.0.3 // indirect
@@ -29,6 +26,7 @@ require (
 	github.com/mitchellh/go-homedir v1.1.0 // indirect
 	github.com/pelletier/go-toml/v2 v2.1.2-0.20240227203013-2b69615b5d55 // indirect
 	github.com/tdewolff/parse/v2 v2.7.19 // indirect
+	golang.org/x/exp v0.0.0-20240707233637-46b078467d37 // indirect
 	golang.org/x/image v0.25.0 // indirect
 	golang.org/x/mod v0.22.0 // indirect
 	golang.org/x/net v0.38.0 // indirect
