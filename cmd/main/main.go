@@ -18,26 +18,27 @@ import (
 func main() {
 	// Define rectangles.
 	rectangles := []*item.Rectangle{
-		{Width: 10, Height: 140},
-		{Width: 60, Height: 170},
-		{Width: 40, Height: 50},
-		{Width: 120, Height: 90},
-		{Width: 100, Height: 320},
-		{Width: 20, Height: 480},
-		{Width: 110, Height: 70},
-		{Width: 90, Height: 110},
-		{Width: 100, Height: 110},
-		{Width: 90, Height: 440},
-		{Width: 50, Height: 120},
-		{Width: 60, Height: 800},
-		{Width: 70, Height: 120},
-		{Width: 80, Height: 10},
+		{Width: 14, Height: 1},
+		{Width: 13, Height: 2},
+		{Width: 12, Height: 3},
+		{Width: 11, Height: 4},
+		{Width: 10, Height: 5},
+		{Width: 9, Height: 6},
+		{Width: 8, Height: 7},
+		{Width: 7, Height: 8},
+		{Width: 6, Height: 8},
+		{Width: 5, Height: 10},
+		{Width: 4, Height: 11},
+		{Width: 3, Height: 12},
+		{Width: 2, Height: 13},
+		{Width: 1, Height: 14},
 	}
 
 	// Define strips.
 	strips := []*container.Strip{
-		{Width: 120},
-		{Width: 100},
+		{Width: 13},
+		{Width: 14},
+		{Width: 15},
 	}
 
 	// Pack rectangles into strips using skyline algo.
@@ -104,16 +105,21 @@ func drawMSPP(packedRectangles []*item.PackedRectangle, strips []*container.Stri
 			maxUpperBound = upperBound
 		}
 	}
+	maxUpperBound += maxRightBound / 20
 
 	b := core.NewBody("Packer")
+
+	b.Styler(func(s *styles.Style) {
+		s.Background = image.NewUniform(color.White)
+	})
 
 	// Normalize rectangles to draw them in the canvas.
 	normalizedRectangles := normalizeRectangles(packedRectangles, maxRightBound, maxUpperBound)
 
 	c := core.NewCanvas(b).SetDraw(func(pc *paint.Painter) {
 		// Draw rectangles.
-		pc.Fill.Color = image.NewUniform(color.RGBA{R: 255, G: 255, B: 255, A: 255})
-		pc.Stroke.Color = image.NewUniform(color.RGBA{R: 0, G: 180, B: 230, A: 255})
+		pc.Fill.Color = image.NewUniform(color.RGBA{R: 128, G: 128, B: 128, A: 255})
+		pc.Stroke.Color = image.NewUniform(color.RGBA{R: 0, G: 0, B: 0, A: 255})
 
 		for _, normRect := range normalizedRectangles {
 			pc.Rectangle(normRect.x, 1-normRect.y-normRect.h, normRect.w, normRect.h)
@@ -121,10 +127,6 @@ func drawMSPP(packedRectangles []*item.PackedRectangle, strips []*container.Stri
 		}
 
 		// Draw strips.
-
-		// Draw bottom line.
-		pc.MoveTo(0, 1)
-		pc.LineTo(1, 1)
 
 		// Draw lines to divide strips.
 		var x uint
@@ -138,7 +140,11 @@ func drawMSPP(packedRectangles []*item.PackedRectangle, strips []*container.Stri
 			pc.LineTo(xNorm, 0)
 		}
 
-		pc.Stroke.Color = image.NewUniform(color.RGBA{R: 200, G: 50, B: 200, A: 255})
+		// Draw bottom line.
+		pc.MoveTo(0, 1)
+		pc.LineTo(xNorm, 1)
+
+		pc.Stroke.Color = image.NewUniform(color.RGBA{R: 255, G: 0, B: 0, A: 255})
 		pc.Stroke.Width.Dp(2)
 		pc.ToDots()
 		pc.Draw()

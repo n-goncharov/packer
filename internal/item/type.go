@@ -2,6 +2,7 @@ package item
 
 import "fmt"
 
+// @todo think about if it is good to have I as Stringer interface here
 type Packed[I fmt.Stringer] struct {
 	Item I
 	X, Y uint
