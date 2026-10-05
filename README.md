@@ -11,7 +11,7 @@
 - [ ] Add automatic browser window opening to display that HTML.
 - [ ] Add automatic generation of rectangle sets.
 - [ ] Add a genetic algorithm.
-- [ ] Add a plot showing the objective function's progression and other useful metaheuristic result data — specifically tailored to the algorithm (e.g., a population diversity plot for the GA).\
+- [ ] Add a plot showing the objective function's progression and other useful metaheuristic result data — specifically tailored to the algorithm (e.g., a population diversity plot for the GA).
 - [ ] Add a TUI.
 - [ ] Add a tree-based heuristic.
 - [ ] Add guillotine/non-guillotine cutting methods to generate rectangles (we will now the optimum for these packages).
