@@ -1,13 +1,19 @@
-# Packer App
+# Packer
 
-## Ideas
-
-1. Add genetic algo.
-2. Add another heuristics (decoders): NFDH, FFDH, BFDH, BL, ...
-3. Add guillotine/non-guillotine cutting methods to generate rectangles. We will now the optimum for these packages.
-4. Add other metaheuristic: simulated annealing, ant colony, ...
-5. Add to UI "history" of packings: arrows "prev", "next" to go through each item's packing 
-or through more global iterations like results of multiple decoder's calls
-6. Use embedded DB to store results (sqlite).
-7. Close todos.
-8. **Prioritize ideas and create sequential global plan for the future work.**
+## Plan
+- [ ] Refactor the current project architecture and code (specifically, address current TODOs).
+  - [ ] Layer interfaces and folder/package structure and naming, including provisions for metaheuristics.
+  - [ ] Implementations.
+- [ ] Run the program based on a configuration file.
+- [ ] Add CLI-flags to run different configs.
+- [ ] Save run results (input and output data).
+- [ ] Add the generation of an HTML file with a packing visualization and other useful data about the run results.
+- [ ] Add automatic browser window opening to display that HTML.
+- [ ] Add automatic generation of rectangle sets.
+- [ ] Add a genetic algorithm.
+- [ ] Add a plot showing the objective function's progression and other useful metaheuristic result data — specifically tailored to the algorithm (e.g., a population diversity plot for the GA).\
+- [ ] Add a TUI.
+- [ ] Add a tree-based heuristic.
+- [ ] Add guillotine/non-guillotine cutting methods to generate rectangles (we will now the optimum for these packages).
+- [ ] Add another queue-based heuristic (e.g., NFDH, FFDH, BFDH, BL).
+- [ ] Add another metaheuristic (e.g., simulated annealing, ant colony).
