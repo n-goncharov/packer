@@ -14,6 +14,6 @@
 - [ ] Add a plot showing the objective function's progression and other useful metaheuristic result data — specifically tailored to the algorithm (e.g., a population diversity plot for the GA).
 - [ ] Add a TUI.
 - [ ] Add a tree-based heuristic.
-- [ ] Add guillotine/non-guillotine cutting methods to generate rectangles (we will now the optimum for these packages).
+- [ ] Add guillotine/non-guillotine cutting methods to generate rectangles (the optimum will be known).
 - [ ] Add another queue-based heuristic (e.g., NFDH, FFDH, BFDH, BL).
 - [ ] Add another metaheuristic (e.g., simulated annealing, ant colony).
