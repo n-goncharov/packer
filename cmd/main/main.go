@@ -10,7 +10,7 @@ import (
 
 func main() {
 	// Init rectangles.
-	rectangles := []*item.Rectangle{
+	rectangles := []*item.Rect{
 		{Width: 14, Height: 1},
 		{Width: 13, Height: 2},
 		{Width: 12, Height: 3},

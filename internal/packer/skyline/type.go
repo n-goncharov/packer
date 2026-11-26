@@ -5,14 +5,14 @@ import (
 	"math"
 )
 
-type segment struct {
+type segm struct {
 	width            uint
 	x, y             uint
-	lHeight, rHeight float64
+	lHeight, rHeight float64 // todo do we need these values? consider checking next and prev segm on nil value
 }
 
-func newSegment(width, x, y uint) *segment {
-	return &segment{
+func newSegm(width, x, y uint) *segm {
+	return &segm{
 		width:   width,
 		x:       x,
 		y:       y,
@@ -22,20 +22,19 @@ func newSegment(width, x, y uint) *segment {
 }
 
 // @todo in a separate package create a separate generic structure for doubly linked list and its implementations
-type segmentNode struct {
-	data *segment
-	next *segmentNode
-	prev *segmentNode
+type segmNode struct {
+	data *segm
+	next *segmNode
+	prev *segmNode
 }
 
-type segmentList struct {
-	head *segmentNode
-	tail *segmentNode
+type segmList struct {
+	head *segmNode
+	tail *segmNode
 }
 
-// @todo call it PushBack
-func (sl *segmentList) append(data *segment) {
-	newNode := &segmentNode{data: data}
+func (sl *segmList) pushBack(data *segm) {
+	newNode := &segmNode{data: data}
 
 	if sl.head == nil {
 		sl.head = newNode
@@ -48,13 +47,13 @@ func (sl *segmentList) append(data *segment) {
 	sl.tail = newNode
 }
 
-func (sl *segmentList) insertBefore(nextNode *segmentNode, data *segment) {
+func (sl *segmList) insertBefore(nextNode *segmNode, data *segm) {
 	if nextNode == nil {
 		fmt.Println("next node is nil")
 		return
 	}
 
-	newNode := &segmentNode{
+	newNode := &segmNode{
 		data: data,
 		prev: nextNode.prev,
 		next: nextNode,
@@ -69,8 +68,7 @@ func (sl *segmentList) insertBefore(nextNode *segmentNode, data *segment) {
 	}
 }
 
-// @todo call it Remove
-func (sl *segmentList) delete(segmentNode *segmentNode) {
+func (sl *segmList) remove(segmentNode *segmNode) {
 	if segmentNode == nil {
 		fmt.Println("segment node is nil")
 		return
@@ -92,7 +90,7 @@ func (sl *segmentList) delete(segmentNode *segmentNode) {
 	segmentNode.next = nil
 }
 
-func (sl *segmentList) topHeight() uint {
+func (sl *segmList) height() uint {
 	var topHeight uint
 	current := sl.head
 	for current != nil {

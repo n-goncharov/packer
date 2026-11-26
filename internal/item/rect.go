@@ -2,16 +2,23 @@ package item
 
 import "fmt"
 
-type Rectangle struct {
+type Rect struct {
 	Width, Height uint
 }
 
-type PackedRectangle = Packed[*Rectangle]
-
-func (r Rectangle) String() string {
+func (r *Rect) String() string {
 	return fmt.Sprintf(
 		"Rect{Width: %d, Height: %d}",
 		r.Width,
 		r.Height,
 	)
+}
+
+type PackedRect struct {
+	Rect
+	Placement
+}
+
+func (p *PackedRect) String() string {
+	return fmt.Sprintf("%s at (%d, %d)", p.Rect.String(), p.X, p.Y)
 }
