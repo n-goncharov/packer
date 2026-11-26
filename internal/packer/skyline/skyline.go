@@ -9,10 +9,10 @@ import (
 	"github.com/n-goncharov/packer/internal/packer"
 )
 
-// todo make all todos in packing folder
-// todo add tests for code here (especially fuzzing)
-// todo try to deduplicate (if possible) and refine
-// todo add GoDoc for all written code
+// TODO Consider checking next and prev segm on nil value instead of storing and recalculating lHeight and rHeight.
+// TODO Reconsider architecture of the entire project.
+// TODO Add tests (especially fuzzing).
+// TODO Add GoDoc for all the written code.
 
 var (
 	ErrInvalidInput = errors.New("invalid input")
@@ -43,7 +43,6 @@ func (d *Packer) Pack(rects []*item.Rect, strips []*container.Strip) (*packer.So
 	}, nil
 }
 
-// TODO - Remove each segm on which each rect cannot be packed (segment's width less than each rect's width)
 func validate(rects []*item.Rect, sl *segmList) error {
 	// Find width of the widest strip.
 	var maxWidth uint

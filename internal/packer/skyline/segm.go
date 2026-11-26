@@ -15,7 +15,7 @@ const notFoundIdx = -1
 type segm struct {
 	width            uint
 	x, y             uint
-	lHeight, rHeight float64 // todo do we need these values? I don't think so. Consider checking next and prev segm on nil value
+	lHeight, rHeight float64
 }
 
 func newSegm(width, x, y uint) *segm {
@@ -42,52 +42,39 @@ func newSegmList(strips []*container.Strip) *segmList {
 	return sl
 }
 
-func (sl *segmList) height() uint {
-	var height uint
-	curr := sl.Head
-	for curr != nil {
-		if curr.Value.y > height {
-			height = curr.Value.y
-		}
-		curr = curr.Next
-	}
-	return height
-}
-
 func (sl *segmList) pack(rects []*item.Rect) ([]*item.PackedRect, error) {
 	packedRects := make([]*item.PackedRect, 0, len(rects))
 	packedFlags := make([]bool, len(rects))
 	for packedCount := 0; packedCount != len(rects); {
-		lbSegmNode, err := sl.lbSegmNode()
+		targetSegmNode, err := sl.targetSegmNode()
 		if err != nil {
 			return nil, err
 		}
 
-		// Get the best-fit rect to pack onto left-bottom segment.
+		// Find the best-fit rectangle to pack onto the target segment.
 		// If no such rect is found then all rects are wider than that segment.
-		// In this case merge LB-segment with the lowest neighboring and start new iteration.
-		bestFitIdx := bestFitIdx(rects, packedFlags, lbSegmNode.Value)
+		// In this case merge the segment with the lowest neighboring and start new iteration.
+		bestFitIdx := bestFitIdx(rects, packedFlags, targetSegmNode.Value)
 		if bestFitIdx == notFoundIdx {
-			if err := sl.merge(lbSegmNode); err != nil {
-				return nil, fmt.Errorf("error merging LB segment: %v", err)
+			if err := sl.merge(targetSegmNode); err != nil {
+				return nil, fmt.Errorf("error merging segment: %v", err)
 			}
 			continue
 		}
-		packedFlags[bestFitIdx] = true
 
 		// If the best-fit rect is found, pack it.
-		packedRect, err := sl.packSingle(rects[bestFitIdx], lbSegmNode)
+		packedRect, err := sl.packSingle(rects[bestFitIdx], targetSegmNode)
 		if err != nil {
 			return nil, fmt.Errorf("error packing rect: %v", err)
 		}
-
 		packedRects = append(packedRects, packedRect)
+		packedFlags[bestFitIdx] = true
 		packedCount++
 	}
 	return packedRects, nil
 }
 
-func (sl *segmList) lbSegmNode() (*list.Node[*segm], error) {
+func (sl *segmList) targetSegmNode() (*list.Node[*segm], error) {
 	lbSegmNode := sl.Head
 	curr := sl.Head.Next
 	for curr != nil {
@@ -97,14 +84,12 @@ func (sl *segmList) lbSegmNode() (*list.Node[*segm], error) {
 		curr = curr.Next
 	}
 
-	// TODO - Consider moving this check to the tests later and remove error return
-	// Here we are not comparing r.Height with zero
-	// because there could be merge with previous segment but next was the same height.
-	if lbSegmNode.Value.lHeight >= 0 || lbSegmNode.Value.rHeight > 0 {
+	lbSegm := lbSegmNode.Value
+	if lbSegm.lHeight >= 0 || lbSegm.rHeight > 0 {
 		return nil, fmt.Errorf(
 			"corrupted LB segment\n lHeight: %f, rHeight: %f",
-			lbSegmNode.Value.lHeight,
-			lbSegmNode.Value.rHeight,
+			lbSegm.lHeight,
+			lbSegm.rHeight,
 		)
 	}
 	return lbSegmNode, nil
@@ -115,7 +100,7 @@ func bestFitIdx(rects []*item.Rect, packedFlags []bool, targetSegm *segm) int {
 	bestFitIdx := notFoundIdx
 	for i, r := range rects {
 		// If the rect has already been packed or
-		// wider than the segment's width, check next.
+		// wider than the segment's width, check next rect.
 		if packedFlags[i] || r.Width > targetSegm.width {
 			continue
 		}
@@ -123,7 +108,6 @@ func bestFitIdx(rects []*item.Rect, packedFlags []bool, targetSegm *segm) int {
 		// Declare fitness value for the current rect.
 		fitVal := 0
 
-		// @todo should lHeight and rHeight be validated here (error if they are > (=?) 0)?
 		// Increment in the following cases:
 		// The rect height and the left segment height are equal.
 		if r.Height == uint(targetSegm.lHeight) {
@@ -149,86 +133,10 @@ func bestFitIdx(rects []*item.Rect, packedFlags []bool, targetSegm *segm) int {
 	return bestFitIdx
 }
 
-func (sl *segmList) adjustLHeight(node *list.Node[*segm], height float64) error {
-	segm := node.Value
-	if math.IsInf(segm.lHeight, -1) {
-		return nil
-	}
-
-	// If the segment isn't on the left edge of the strip,
-	// adjust its left height and the right height of the prev segment.
-	if node == sl.Head {
-		return errors.New("corrupted left height of the very first segment")
-	}
-	segm.lHeight += height
-	node.Prev.Value.rHeight = -segm.lHeight
-	return nil
-}
-
-func (sl *segmList) adjustRHeight(node *list.Node[*segm], height float64) error {
-	segm := node.Value
-	if math.IsInf(segm.rHeight, -1) {
-		return nil
-	}
-
-	// If the segment isn't on the right edge of the strip,
-	// adjust its right height and the left height of the next segment.
-	if node == sl.Tail {
-		return errors.New("corrupted right height of the very last segment")
-	}
-	segm.rHeight += height
-	node.Next.Value.lHeight = -segm.rHeight
-
-	return nil
-}
-
-func (sl *segmList) mergeNext(node *list.Node[*segm]) error {
-	segm := node.Value
-	if node == sl.Tail {
-		return errors.New("trying to merge last segment with next")
-	}
-
-	if err := sl.adjustLHeight(node, -segm.rHeight); err != nil {
-		return err
-	}
-
-	// Adjust the width, y-coordinate, right height of the segment.
-	segm.width += node.Next.Value.width
-	segm.y = node.Next.Value.y
-	segm.rHeight = node.Next.Value.rHeight
-
-	// Delete the next segment.
-	sl.Remove(node.Next)
-
-	return nil
-}
-
-func (sl *segmList) mergePrev(node *list.Node[*segm]) error {
-	segm := node.Value
-	if node == sl.Head {
-		return errors.New("trying to merge first segment with prev")
-	}
-
-	if err := sl.adjustRHeight(node, -segm.lHeight); err != nil {
-		return err
-	}
-
-	// Adjust the width, x-coordinate, y-coordinate, left height of the segment.
-	segm.width += node.Prev.Value.width
-	segm.x = node.Prev.Value.x
-	segm.y = node.Prev.Value.y
-	segm.lHeight = node.Prev.Value.lHeight
-
-	// Delete the prev segment.
-	sl.Remove(node.Prev)
-
-	return nil
-}
-
 func (sl *segmList) merge(node *list.Node[*segm]) error {
 	segm := node.Value
 	// In case segment is a strip, and we cannot merge it -> just delete this segment.
-	if math.IsInf(segm.lHeight, -1) && math.IsInf(node.Value.rHeight, -1) {
+	if math.IsInf(segm.lHeight, -1) && math.IsInf(segm.rHeight, -1) {
 		sl.Remove(node)
 		return nil
 	}
@@ -238,6 +146,53 @@ func (sl *segmList) merge(node *list.Node[*segm]) error {
 		return sl.mergeNext(node)
 	}
 	return sl.mergePrev(node)
+}
+
+func (sl *segmList) mergePrev(node *list.Node[*segm]) error {
+	segm := node.Value
+	prevSegm := node.Prev.Value
+
+	if node == sl.Head {
+		return errors.New("trying to merge first segment with prev")
+	}
+
+	if err := sl.adjustRHeight(node, -segm.lHeight); err != nil {
+		return err
+	}
+
+	// Adjust the width, x-coordinate, y-coordinate, left height of the segment.
+	segm.width += prevSegm.width
+	segm.x = prevSegm.x
+	segm.y = prevSegm.y
+	segm.lHeight = prevSegm.lHeight
+
+	// Delete the prev segment.
+	sl.Remove(node.Prev)
+
+	return nil
+}
+
+func (sl *segmList) mergeNext(node *list.Node[*segm]) error {
+	segm := node.Value
+	nextSegm := node.Next.Value
+
+	if node == sl.Tail {
+		return errors.New("trying to merge last segment with next")
+	}
+
+	if err := sl.adjustLHeight(node, -segm.rHeight); err != nil {
+		return err
+	}
+
+	// Adjust the width, y-coordinate, right height of the segment.
+	segm.width += nextSegm.width
+	segm.y = nextSegm.y
+	segm.rHeight = nextSegm.rHeight
+
+	// Delete the next segment.
+	sl.Remove(node.Next)
+
+	return nil
 }
 
 func (sl *segmList) packSingle(rect *item.Rect, node *list.Node[*segm]) (*item.PackedRect, error) {
@@ -250,7 +205,6 @@ func (sl *segmList) packSingle(rect *item.Rect, node *list.Node[*segm]) (*item.P
 
 	switch {
 	case packedRect.Width == segm.width:
-		// Adjust the y-coordinate.
 		segm.y += rect.Height
 
 		if err := sl.adjustLHeight(node, float64(rect.Height)); err != nil {
@@ -289,4 +243,49 @@ func (sl *segmList) packSingle(rect *item.Rect, node *list.Node[*segm]) (*item.P
 		return nil, fmt.Errorf("rect is wider than segment")
 	}
 	return packedRect, nil
+}
+
+func (sl *segmList) adjustLHeight(node *list.Node[*segm], height float64) error {
+	segm := node.Value
+	if math.IsInf(segm.lHeight, -1) {
+		return nil
+	}
+
+	// If the segment isn't on the left edge of the strip,
+	// adjust its left height and the right height of the prev segment.
+	if node == sl.Head {
+		return errors.New("corrupted left height of the very first segment")
+	}
+	segm.lHeight += height
+	node.Prev.Value.rHeight = -segm.lHeight
+	return nil
+}
+
+func (sl *segmList) adjustRHeight(node *list.Node[*segm], height float64) error {
+	segm := node.Value
+	if math.IsInf(segm.rHeight, -1) {
+		return nil
+	}
+
+	// If the segment isn't on the right edge of the strip,
+	// adjust its right height and the left height of the next segment.
+	if node == sl.Tail {
+		return errors.New("corrupted right height of the very last segment")
+	}
+	segm.rHeight += height
+	node.Next.Value.lHeight = -segm.rHeight
+
+	return nil
+}
+
+func (sl *segmList) height() uint {
+	var height uint
+	curr := sl.Head
+	for curr != nil {
+		if curr.Value.y > height {
+			height = curr.Value.y
+		}
+		curr = curr.Next
+	}
+	return height
 }
