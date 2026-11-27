@@ -1,6 +1,18 @@
 # Packer
 
-## Plan
+## Getting Started
+
+### Prerequisites
+
+- `Go 1.27.4+`
+### Running
+
+```sh
+go run cmd/main/main.go
+```
+
+
+## Project Plan
 - [ ] Refactor the current project architecture and code (specifically, address current TODOs).
   - [ ] Layer interfaces and folder/package structure and naming, including provisions for metaheuristics.
   - [ ] Implementations.
