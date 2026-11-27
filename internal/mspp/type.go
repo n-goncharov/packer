@@ -3,10 +3,10 @@ package mspp
 import "github.com/n-goncharov/packer/internal/item"
 
 type Strip struct {
-	Width uint
+	Width int
 }
 
 type Solution struct {
 	PackedRects []item.PackedRect
-	FitVal      uint
+	FitVal      int
 }

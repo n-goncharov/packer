@@ -3,7 +3,7 @@ package item
 import "fmt"
 
 type Rect struct {
-	Width, Height uint
+	Width, Height int
 }
 
 func (r Rect) String() string {
@@ -16,7 +16,7 @@ func (r Rect) String() string {
 
 type PackedRect struct {
 	Rect
-	X, Y uint
+	X, Y int
 }
 
 func (p PackedRect) String() string {
