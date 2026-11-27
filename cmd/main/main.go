@@ -3,14 +3,14 @@ package main
 import (
 	"fmt"
 
-	"github.com/n-goncharov/packer/internal/container"
 	"github.com/n-goncharov/packer/internal/item"
-	"github.com/n-goncharov/packer/internal/packer/skyline"
+	"github.com/n-goncharov/packer/internal/mspp"
+	"github.com/n-goncharov/packer/internal/mspp/skyline"
 )
 
 func main() {
 	// Init rectangles.
-	rectangles := []*item.Rect{
+	rectangles := []item.Rect{
 		{Width: 14, Height: 1},
 		{Width: 13, Height: 2},
 		{Width: 12, Height: 3},
@@ -28,7 +28,7 @@ func main() {
 	}
 
 	// Init strips.
-	strips := []*container.Strip{
+	strips := []mspp.Strip{
 		{Width: 13},
 		{Width: 14},
 		{Width: 15},
@@ -42,9 +42,9 @@ func main() {
 	}
 
 	// Print results.
-	for _, i := range solution.PackedItems {
+	for _, i := range solution.PackedRects {
 		fmt.Println(i)
 	}
 
-	fmt.Println(solution.FitnessValue)
+	fmt.Println(solution.FitVal)
 }

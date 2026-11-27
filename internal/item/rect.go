@@ -6,7 +6,7 @@ type Rect struct {
 	Width, Height uint
 }
 
-func (r *Rect) String() string {
+func (r Rect) String() string {
 	return fmt.Sprintf(
 		"Rect{Width: %d, Height: %d}",
 		r.Width,
@@ -16,9 +16,9 @@ func (r *Rect) String() string {
 
 type PackedRect struct {
 	Rect
-	Placement
+	X, Y uint
 }
 
-func (p *PackedRect) String() string {
+func (p PackedRect) String() string {
 	return fmt.Sprintf("%s at (%d, %d)", p.Rect.String(), p.X, p.Y)
 }
