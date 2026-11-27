@@ -4,6 +4,21 @@ import (
 	"slices"
 )
 
+type skyline struct {
+	segments []segment
+}
+
+func newSkyline(x, width int) skyline {
+	return skyline{
+		segments: []segment{
+			{
+				x:     x,
+				width: width,
+			},
+		},
+	}
+}
+
 func (s *skyline) fillGap(segmentIdx int) {
 	if len(s.segments) == 1 {
 		s.segments = slices.Delete(s.segments, 0, 1)
